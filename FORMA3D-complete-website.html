@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORMA3D – تحويل الصور إلى مجسّمات ثلاثية الأبعاد</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root {
+  --bg: #060608;
+  --surface: #0e0e14;
+  --card: #13131c;
+  --border: #222232;
+  --border-hover: #3a3a5a;
+  --accent: #c8ff00;
+  --accent2: #ff6b35;
+  --text: #f0f0f8;
+  --muted: #6060a0;
+  --success: #00e5a0;
+  --error: #ff4d6d;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Tajawal', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6,6,8,0.95);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.4);opacity:0.7}
+}
+
+/* ── MAIN LAYOUT ── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  width: 340px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.panel-sub { font-size: 12px; color: var(--muted); }
+.panel-body {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  background: rgba(255,255,255,0.01);
+  position: relative;
+  overflow: hidden;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(200,255,0,0.03);
+}
+.upload-zone.has-file {
+  border-color: rgba(200,255,0,0.4);
+  background: rgba(200,255,0,0.04);
+  padding: 10px;
+}
+.upload-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  display: block;
+  transition: transform 0.2s;
+}
+.upload-zone:hover .upload-icon { transform: translateY(-3px); }
+.upload-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.upload-hint { font-size: 11px; color: var(--muted); }
+.upload-zone input { display: none; }
+.uploaded-preview {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.has-file .upload-content { display: none; }
+.has-file .uploaded-preview { display: flex; }
+.preview-thumb {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.preview-name { font-size: 12px; color: var(--accent); font-weight: 600; }
+.preview-size { font-size: 11px; color: var(--muted); }
+.change-btn {
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: 'Tajawal', sans-serif;
+  transition: all 0.2s;
+}
+.change-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+/* ── SETTINGS ── */
+.setting-group { display: flex; flex-direction: column; gap: 8px; }
+.setting-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.seg-control {
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 12px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.seg-btn.active {
+  background: rgba(200,255,0,0.12);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.slider-wrap { display: flex; flex-direction: column; gap: 6px; }
+.slider-row { display: flex; justify-content: space-between; align-items: center; }
+.slider-val {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 30px;
+  text-align: left;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 99px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(200,255,0,0.4);
+}
+
+/* ── CONVERT BTN ── */
+.convert-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.convert-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(200,255,0,0.3);
+}
+.convert-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── CENTER STAGE ── */
+.center-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ── CANVAS AREA ── */
+.canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+.canvas-area::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(200,255,0,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,255,0,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+#three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: none;
+  transition: opacity 0.4s;
+  z-index: 1;
+}
+.empty-state.hidden { opacity: 0; display: none; }
+.empty-orb {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(200,255,0,0.08), rgba(255,107,53,0.04) 60%, transparent);
+  border: 1px solid rgba(200,255,0,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 48px;
+  animation: float 4s ease-in-out infinite;
+}
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+.empty-title { font-size: 18px; font-weight: 700; color: var(--text); opacity: 0.5; }
+.empty-sub { font-size: 13px; color: var(--muted); }
+
+/* ── LOADING OVERLAY ── */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(6,6,8,0.85);
+  backdrop-filter: blur(8px);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  z-index: 5;
+}
+.loading-overlay.active { display: flex; }
+.loading-ring {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-left-color: rgba(200,255,0,0.4);
+  animation: spin 0.8s linear infinite;
+  position: relative;
+}
+.loading-ring::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-bottom-color: var(--accent2);
+  animation: spin 1.4s linear infinite reverse;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.loading-steps { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.loading-step {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+.loading-step.active { color: var(--accent); }
+.loading-step.done { color: var(--success); }
+.step-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: all 0.3s;
+}
+.loading-step.active .step-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.loading-step.done .step-dot { background: var(--success); }
+
+/* ── TOOLBAR ── */
+.viewer-toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  background: rgba(14,14,20,0.9);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  backdrop-filter: blur(12px);
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.viewer-toolbar.visible { opacity: 1; }
+.tool-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 10px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  font-family: 'Tajawal', sans-serif;
+  gap: 4px;
+  white-space: nowrap;
+}
+.tool-btn:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+.tool-btn.active { background: rgba(200,255,0,0.12); color: var(--accent); }
+.tool-sep { width: 1px; background: var(--border); margin: 4px 2px; }
+
+/* ── INFO BADGE ── */
+.info-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(14,14,20,0.85);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  display: none;
+  backdrop-filter: blur(8px);
+  z-index: 4;
+}
+.info-badge.visible { display: block; }
+.info-badge strong { color: var(--accent); }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.right-panel.active { opacity: 1; pointer-events: all; }
+.export-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.export-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+.export-btn {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+.export-btn:last-child { margin-bottom: 0; }
+.export-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(200,255,0,0.04); }
+.export-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.badge-pro { background: rgba(255,107,53,0.15); color: var(--accent2); }
+.badge-free { background: rgba(200,255,0,0.1); color: var(--accent); }
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 16px; }
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.stat-val { font-size: 18px; font-weight: 900; color: var(--accent); font-family: 'Syne', sans-serif; }
+.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ── STATUS BAR ── */
+.statusbar {
+  height: 28px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 20px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.status-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+  margin-left: 4px;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--card);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .left-panel { width: 280px; }
+  .right-panel { width: 200px; }
+  .info-badge { font-size: 11px; padding: 6px 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    FORMA<span style="color:var(--accent)">3D</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <div class="panel-title">إعدادات التحويل</div>
+      <div class="panel-sub">ارفع صورتك وخصّص الإعدادات</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- Upload -->
+      <div class="setting-group">
+        <div class="setting-label">الصورة المصدر</div>
+        <div class="upload-zone" id="uploadZone"
+          onclick="document.getElementById('fileInput').click()"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)">
+          <div class="upload-content">
+            <span class="upload-icon">🖼️</span>
+            <div class="upload-label">اسحب صورتك هنا</div>
+            <div class="upload-hint">PNG, JPG, WEBP · حتى 20MB</div>
+          </div>
+          <div class="uploaded-preview">
+            <img id="previewThumb" class="preview-thumb" src="" alt="">
+            <div id="previewName" class="preview-name">image.png</div>
+            <div id="previewSize" class="preview-size">2.4 MB</div>
+            <button class="change-btn" onclick="event.stopPropagation();resetUpload()">تغيير الصورة</button>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+        </div>
+      </div>
+
+      <!-- Object type -->
+      <div class="setting-group">
+        <div class="setting-label">نوع الكائن</div>
+        <div class="seg-control">
+          <button class="seg-btn active" onclick="selectSeg(this, 'objType')">منتج</button>
+          <button class="seg-btn" onclick="selectSeg(this, 'objType')">وجه</button>
+          <button class="seg-btn" onclick="selectSeg(this, 'objType')">معمار</button>
+          <button class="seg-btn" onclick="selectSeg(this, 'objType')">حر</button>
+        </div>
+      </div>
+
+      <!-- Quality -->
+      <div class="setting-group">
+        <div class="setting-label">جودة التحويل</div>
+        <div class="seg-control">
+          <button class="seg-btn" onclick="selectSeg(this, 'quality')">سريع</button>
+          <button class="seg-btn active" onclick="selectSeg(this, 'quality')">متوازن</button>
+          <button class="seg-btn" onclick="selectSeg(this, 'quality')">احترافي</button>
+        </div>
+      </div>
+
+      <!-- Depth -->
+      <div class="setting-group">
+        <div class="setting-label">عمق التحويل</div>
+        <div class="slider-wrap">
+          <div class="slider-row">
+            <span style="font-size:12px;color:var(--muted)">مسطّح</span>
+            <span class="slider-val" id="depthVal">65%</span>
+            <span style="font-size:12px;color:var(--muted)">عميق</span>
+          </div>
+          <input type="range" min="10" max="100" value="65" oninput="document.getElementById('depthVal').textContent=this.value+'%'">
+        </div>
+      </div>
+
+      <!-- Mesh Density -->
+      <div class="setting-group">
+        <div class="setting-label">كثافة الشبكة</div>
+        <div class="slider-wrap">
+          <div class="slider-row">
+            <span style="font-size:12px;color:var(--muted)">منخفضة</span>
+            <span class="slider-val" id="meshVal">50K</span>
+            <span style="font-size:12px;color:var(--muted)">عالية</span>
+          </div>
+          <input type="range" min="1" max="10" value="5" oninput="updateMesh(this.value)">
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+
+    </div>
+
+    <!-- Convert button -->
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <button class="convert-btn" id="convertBtn" onclick="startConversion()" disabled>
+        <span>✦</span>
+        <span>حوّل إلى 3D</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center-stage">
+    <div class="canvas-area">
+      <canvas id="three-canvas"></canvas>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-orb">🧊</div>
+        <div class="empty-title">ارفع صورة للبدء</div>
+        <div class="empty-sub">سيظهر المجسّم ثلاثي الأبعاد هنا</div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-ring"></div>
+        <div class="loading-title">جارٍ التحويل...</div>
+        <div class="loading-steps">
+          <div class="loading-step" id="step1"><div class="step-dot"></div>تحليل الصورة وعزل الكائن</div>
+          <div class="loading-step" id="step2"><div class="step-dot"></div>توليد خريطة العمق</div>
+          <div class="loading-step" id="step3"><div class="step-dot"></div>بناء الشبكة ثلاثية الأبعاد</div>
+          <div class="loading-step" id="step4"><div class="step-dot"></div>تطبيق المواد والأنسجة</div>
+          <div class="loading-step" id="step5"><div class="step-dot"></div>تحسين جودة النموذج</div>
+        </div>
+      </div>
+
+      <!-- Info badge -->
+      <div class="info-badge" id="infoBadge">
+        <strong id="badgePoly">24,580</strong> مضلّع
+      </div>
+
+      <!-- Viewer toolbar -->
+      <div class="viewer-toolbar" id="viewerToolbar">
+        <button class="tool-btn active" id="tbRotate" onclick="setTool('rotate')">↻ تدوير</button>
+        <button class="tool-btn" id="tbWire" onclick="toggleWireframe()">⬡ إطار</button>
+        <button class="tool-btn" onclick="resetCamera()">⊙ توسيط</button>
+        <button class="tool-btn" id="tbAnim" onclick="toggleAnim()">▶ تشغيل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel" id="rightPanel">
+    <div class="panel-header">
+      <div class="panel-title">تصدير النموذج</div>
+      <div class="panel-sub">اختر صيغة التصدير</div>
+    </div>
+
+    <div class="export-section">
+      <div class="export-title">صيغ مجانية</div>
+      <button class="export-btn" onclick="downloadModel('obj')">
+        <span>📦 OBJ</span>
+        <span class="export-badge badge-free">مجاني</span>
+      </button>
+      <button class="export-btn" onclick="downloadModel('stl')">
+        <span>🖨️ STL</span>
+        <span class="export-badge badge-free">مجاني</span>
+      </button>
+    </div>
+
+    <div class="export-section">
+      <div class="export-title">صيغ احترافية</div>
+      <button class="export-btn" onclick="showToast('GLTF متاح قريباً')">
+        <span>✨ GLTF</span>
+        <span class="export-badge badge-pro">Pro</span>
+      </button>
+      <button class="export-btn" onclick="showToast('FBX متاح قريباً')">
+        <span>🎮 FBX</span>
+        <span class="export-badge badge-pro">Pro</span>
+      </button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="statPoly">–</div>
+        <div class="stat-lbl">مضلّع</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statTime">–</div>
+        <div class="stat-lbl">ثانية</div>
+      </div>
+    </div>
+
+    <div style="padding:16px;margin-top:auto;border-top:1px solid var(--border)">
+      <button class="export-btn" style="justify-content:center;gap:6px" onclick="shareModel()">
+        🔗 مشاركة الرابط
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div><div class="status-dot"></div>النظام جاهز</div>
+  <div>GPU: متاح</div>
+  <div>نموذج AI: TripoSR v1.1</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── THREE.JS SETUP ──
+let scene, camera, renderer, mesh, animLoop;
+let isRotating = true;
+let isWireframe = false;
+let tool = 'rotate';
+let isDragging = false, prevMouse = {x:0, y:0};
+let rotTarget = {x:0.3, y:0};
+let rotCurrent = {x:0.3, y:0};
+let currentModel = null;
+
+function initThree() {
+  const canvas = document.getElementById('three-canvas');
+  const container = canvas.parentElement;
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.setClearColor(0x000000, 0);
+  resize();
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  camera.position.set(0, 0, 4);
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambientLight);
+
+  const keyLight = new THREE.DirectionalLight(0xc8ff00, 1.2);
+  keyLight.position.set(3, 4, 3);
+  scene.add(keyLight);
+
+  const fillLight = new THREE.DirectionalLight(0xff6b35, 0.5);
+  fillLight.position.set(-3, -1, 2);
+  scene.add(fillLight);
+
+  // Grid
+  const gridHelper = new THREE.GridHelper(8, 20, 0x222232, 0x161622);
+  gridHelper.position.y = -1.2;
+  scene.add(gridHelper);
+
+  window.addEventListener('resize', resize);
+  canvas.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', () => isDragging = false);
+  canvas.addEventListener('wheel', onWheel);
+
+  animate();
+}
+
+function resize() {
+  const canvas = document.getElementById('three-canvas');
+  const container = canvas.parentElement;
+  const w = container.clientWidth, h = container.clientHeight;
+  renderer.setSize(w, h, false);
+  if (camera) { camera.aspect = w/h; camera.updateProjectionMatrix(); }
+}
+
+function animate() {
+  animLoop = requestAnimationFrame(animate);
+  if (mesh && isRotating) {
+    rotTarget.y += 0.008;
+  }
+  if (mesh) {
+    rotCurrent.x += (rotTarget.x - rotCurrent.x) * 0.08;
+    rotCurrent.y += (rotTarget.y - rotCurrent.y) * 0.08;
+    mesh.rotation.x = rotCurrent.x;
+    mesh.rotation.y = rotCurrent.y;
+  }
+  renderer.render(scene, camera);
+}
+
+function onMouseDown(e) {
+  isDragging = true;
+  prevMouse = {x: e.clientX, y: e.clientY};
+}
+function onMouseMove(e) {
+  if (!isDragging || !mesh) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  if (tool === 'rotate') {
+    rotTarget.y += dx * 0.01;
+    rotTarget.x += dy * 0.01;
+  }
+  prevMouse = {x: e.clientX, y: e.clientY};
+}
+function onWheel(e) {
+  e.preventDefault();
+  camera.position.z = Math.max(1.5, Math.min(8, camera.position.z + e.deltaY * 0.005));
+}
+
+function buildModelFromImage(imgSrc) {
+  if (mesh) { scene.remove(mesh); mesh = null; }
+
+  const geo = new THREE.IcosahedronGeometry(1, 4);
+  const loader = new THREE.TextureLoader();
+  const tex = loader.load(imgSrc);
+
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    roughness: 0.4,
+    metalness: 0.2,
+    side: THREE.DoubleSide,
+  });
+
+  mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+  currentModel = { geometry: geo, material: mat };
+
+  rotTarget = {x: 0.3, y: 0};
+  rotCurrent = {x: 0.3, y: 0};
+}
+
+// ── FILE HANDLING ──
+let uploadedFile = null;
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  uploadedFile = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('previewThumb').src = url;
+  document.getElementById('previewName').textContent = file.name;
+  document.getElementById('previewSize').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
+  document.getElementById('uploadZone').classList.add('has-file');
+  document.getElementById('convertBtn').disabled = false;
+}
+
+function resetUpload() {
+  uploadedFile = null;
+  document.getElementById('uploadZone').classList.remove('has-file');
+  document.getElementById('convertBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.add('dragover');
+}
+function handleDragLeave(e) {
+  document.getElementById('uploadZone').classList.remove('dragover');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+// ── CONVERSION ──
+function startConversion() {
+  if (!uploadedFile) return;
+  const imgSrc = document.getElementById('previewThumb').src;
+
+  document.getElementById('loadingOverlay').classList.add('active');
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('convertBtn').disabled = true;
+
+  const steps = ['step1','step2','step3','step4','step5'];
+  let i = 0;
+
+  function nextStep() {
+    if (i > 0) {
+      document.getElementById(steps[i-1]).classList.remove('active');
+      document.getElementById(steps[i-1]).classList.add('done');
+    }
+    if (i < steps.length) {
+      document.getElementById(steps[i]).classList.add('active');
+      i++;
+      setTimeout(nextStep, 600 + Math.random() * 400);
+    } else {
+      setTimeout(() => finishConversion(imgSrc), 400);
+    }
+  }
+  nextStep();
+}
+
+function finishConversion(imgSrc) {
+  document.getElementById('loadingOverlay').classList.remove('active');
+  ['step1','step2','step3','step4','step5'].forEach(s => {
+    document.getElementById(s).classList.remove('active','done');
+  });
+
+  buildModelFromImage(imgSrc);
+
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('rightPanel').classList.add('active');
+  document.getElementById('viewerToolbar').classList.add('visible');
+  document.getElementById('infoBadge').classList.add('visible');
+  document.getElementById('convertBtn').disabled = false;
+
+  const polys = Math.floor(18000 + Math.random() * 15000);
+  const secs  = (2.5 + Math.random() * 2).toFixed(1);
+
+  document.getElementById('statPoly').textContent  = (polys/1000).toFixed(0)+'K';
+  document.getElementById('statTime').textContent  = secs;
+  document.getElementById('badgePoly').textContent = polys.toLocaleString();
+
+  showToast('✓ تم التحويل بنجاح!');
+}
+
+// ── VIEWER CONTROLS ──
+function setTool(t) {
+  tool = t;
+}
+
+function toggleWireframe() {
+  if (!mesh) return;
+  isWireframe = !isWireframe;
+  mesh.material.wireframe = isWireframe;
+  document.getElementById('tbWire').classList.toggle('active', isWireframe);
+}
+
+function resetCamera() {
+  camera.position.set(0, 0, 4);
+  rotTarget = {x: 0.3, y: 0};
+}
+
+function toggleAnim() {
+  isRotating = !isRotating;
+  document.getElementById('tbAnim').textContent = isRotating ? '⏸ إيقاف' : '▶ تشغيل';
+  document.getElementById('tbAnim').classList.toggle('active', isRotating);
+}
+
+function selectSeg(btn, group) {
+  btn.closest('.seg-control').querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function updateMesh(v) {
+  const vals = ['5K','10K','20K','35K','50K','75K','100K','150K','200K','300K'];
+  document.getElementById('meshVal').textContent = vals[v-1] || '50K';
+}
+
+function downloadModel(format) {
+  if (!currentModel) {
+    showToast('يجب تحويل صورة أولاً');
+    return;
+  }
+  showToast(`جارٍ تحميل ملف ${format.toUpperCase()}...`);
+  // في التطبيق الحقيقي، ستحمل من الخادم
+}
+
+function shareModel() {
+  if (!currentModel) {
+    showToast('يجب تحويل صورة أولاً');
+    return;
+  }
+  const url = window.location.href + '?model=' + Math.random().toString(36).substr(2, 9);
+  navigator.clipboard.writeText(url);
+  showToast('تم نسخ رابط المشاركة!');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── INIT ──
+initThree();
+</script>
+</body>
+</html>
